@@ -11,7 +11,7 @@ def test():
 '''))
 ```
 
-output
+#### output
 
 ```javascript
 let test = () => {
@@ -47,7 +47,7 @@ def main():
 print(py2js.convert(main))
 ```
 
-output
+#### output
 
 ```javascript
 let main = () => {
