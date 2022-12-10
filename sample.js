@@ -1,55 +1,3 @@
-# Write javascript in python with python syntax
-
-## Usage
-
-### sample 1
-
-```python
-print(py2js.convert('''
-def test():
-    console.log('text')
-'''))
-```
-
-output
-
-```javascript
-let test = () => {
-    console.log("text")
-}
-```
-
-### sample 2
-
-```python
-import py2js
-
-def main():
-    class Test:
-        def log(text):
-            console.log(text)
-
-    class Main(Test):
-        def __init__(self, a, b, *args) -> None:
-            self.a = a
-            self.b = b
-            self.args = args
-        
-        def sum(self):
-            self.log([self.a, self.b, *self.args].reduce(lambda sum, element: sum + element, 0))
-
-    @console.log
-    class Decorated:
-        pass
-
-    Main(1, 2, 3, 4, 5).sum()
-
-print(py2js.convert(main))
-```
-
-output
-
-```javascript
 let main = () => {
     let Test = class {
         constructor(...args) {
@@ -130,4 +78,3 @@ let main = () => {
     };
     Main(true, 2, 3, 4, 5).sum()
 }
-```

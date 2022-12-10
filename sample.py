@@ -1,10 +1,5 @@
 import py2js
 
-print('sample1\n', py2js.convert('''
-def test():
-    console.log('text')
-'''))
-
 def main():
     class Test:
         def log(text):
@@ -25,4 +20,4 @@ def main():
 
     Main(1, 2, 3, 4, 5).sum()
 
-print('sample2\n', py2js.convert(main))
+print(py2js.convert(main))

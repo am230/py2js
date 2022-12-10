@@ -1,24 +1,28 @@
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, find_namespace_packages
 
 with open('README.md', mode='r', encoding='utf-8') as f:
     long_description = f.read()
 
 with open('requirements.txt', mode='r', encoding='utf-8') as f:
-    requires = f.readlines()
+    requires = map(str.strip, f.readlines())
+
+author = 'am230'
+name = 'py2js'
+py_modules = [name]
 
 setup(
-    name="py2js",
-    version="1.0.0",
-    keywords=("javascript", "py2js"),
-    description="a fast and simple micro-framework for small web applications",
+    name=name,
+    version="1.0.1",
+    keywords=("javascript", "convert"),
+    description="Write javascript in python with python syntax",
     long_description=long_description,
-    long_description_content_type='text/markdown',  # This is important!
+    long_description_content_type='text/markdown',
     license="MIT Licence",
-    url="https://github.com/am230/py2js",
-    author="am230",
+    url=f"https://github.com/{author}/{name}",
+    author=author,
     author_email="am.230@outlook.jp",
-    py_modules=['py2js'],
+    py_modules=py_modules,
     platforms="any",
-    requires=requires,
-    packages=find_packages()
+    packages=find_packages(),
+    requires=requires
 )
