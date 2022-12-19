@@ -12,7 +12,7 @@ py_modules = [name]
 
 setup(
     name=name,
-    version="1.0.1",
+    version="1.0.3",
     keywords=("javascript", "convert"),
     description="Write javascript in python with python syntax",
     long_description=long_description,

@@ -289,6 +289,9 @@ class CodeGen(Visitor[JSVisitorContext]):
     def visit_Tuple(self, *args):
         return f'/*tuple*/{self.visit_List(*args)}'
 
+    def visit_Dict(self, node: ast.Dict, ctx: JSVisitorContext):
+        return '{%s}' % ', '.join(f'{self.visit(key, ctx.copy(scope=JSScope.F_STRING))}: {self.visit(value, ctx)}' for key, value in zip(node.keys, node.values))
+
     def visit_Lambda(self, node: ast.Lambda, ctx: JSVisitorContext):
         return BaseBuilder().write(f'{self.visit(node.args, ctx)}=>').write(self.visit(node.body, ctx)).build()
 
