@@ -49,12 +49,13 @@ class JSScope(enum.Enum):
     CLASS_FIELD = 1
     FUNCTION_FIELD = 2
     ARGUMENT = 3
+    F_STRING = 4
 
 
 @dataclasses.dataclass
 class JSVisitorContext(VisitorContext):
     # import_mode: ImportMode = dataclasses.field(default='import')
-    locals_variables: t.Dict[str, type] = dataclasses.field(default_factory=dict)
+    local_variables: t.Dict[str, type] = dataclasses.field(default_factory=dict)
     scope: JSScope = dataclasses.field(default=JSScope.MODULE)
     boolop_table: t.Dict[type, str] = dataclasses.field(default_factory=BoolOpTable.copy)
     unaryop_table: t.Dict[type, str] = dataclasses.field(default_factory=UnaryOpTable.copy)
@@ -63,10 +64,10 @@ class JSVisitorContext(VisitorContext):
     parent: ast.AST = dataclasses.field(default=None)
     node: ast.AST = dataclasses.field(default=None)
 
-    def copy(self, node: t.Optional[ast.AST] = None) -> 'JSVisitorContext':
+    def copy(self, node: t.Optional[ast.AST] = None, scope: t.Optional[JSScope] = None) -> 'JSVisitorContext':
         return JSVisitorContext(
-            self.locals_variables,
-            self.scope,
+            self.local_variables,
+            scope or self.scope,
             self.boolop_table,
             self.unaryop_table,
             self.operator_table,
@@ -131,8 +132,7 @@ class CodeGen(Visitor[JSVisitorContext]):
             });
         }
         """
-        context = ctx.copy()
-        context.scope = JSScope.CLASS_FIELD
+        context = ctx.copy(scope=JSScope.CLASS_FIELD)
 
         body = node.body
 
@@ -170,6 +170,24 @@ class CodeGen(Visitor[JSVisitorContext]):
                    .write(self.visit(node.body, context)))\
             .build()
 
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef, ctx: JSVisitorContext):
+        context = ctx.copy(scope=JSScope.FUNCTION_FIELD)
+
+        if ctx.scope == JSScope.CLASS_FIELD:
+            return BaseBuilder()\
+                .write(node.name)\
+                .write(f'{self.visit(node.args, ctx)}')\
+                .write(SurroundBuilder(surround='{}')
+                       .write(self.visit(node.body, context)))\
+                .build()
+        return BaseBuilder('let')\
+            .write(node.name)\
+            .write('=')\
+            .write(f'async {self.visit(node.args, ctx)} =>')\
+            .write(SurroundBuilder(surround='{}')
+                   .write(self.visit(node.body, context)))\
+            .build()
+
     def visit_If(self, node: ast.If, ctx: JSVisitorContext):
         return BaseBuilder('if').write(SurroundBuilder(surround='()').write(self.visit(node.test, ctx))).write(SurroundBuilder(surround='{}').write(self.visit(node.body, ctx))).build()
 
@@ -203,7 +221,7 @@ class CodeGen(Visitor[JSVisitorContext]):
     def visit_Constant(self, node: ast.Constant, ctx: JSVisitorContext):
         if node.value in ctx.constant_table:
             return ctx.constant_table[node.value]
-        if isinstance(node.value, str):
+        if ctx.scope != JSScope.F_STRING and isinstance(node.value, str):
             return f'"{node.value}"'
         else:
             return f'{node.value}'
@@ -212,8 +230,7 @@ class CodeGen(Visitor[JSVisitorContext]):
         return BaseBuilder().write_if(not any(map(lambda target: isinstance(target, ast.Attribute), node.targets)) and ctx.scope != JSScope.CLASS_FIELD, 'let').write(f'{self.visit(node.targets, ctx)} = {self.visit(node.value, ctx)}').build()
 
     def visit_Call(self, node: ast.Call, ctx: JSVisitorContext):
-        context = ctx.copy()
-        context.scope = JSScope.ARGUMENT
+        context = ctx.copy(scope=JSScope.ARGUMENT)
 
         starreds = tuple(filter(lambda arg: isinstance(arg, ast.Starred), node.args))
         args = filter(lambda arg: not isinstance(arg, ast.Starred), node.args)
@@ -231,8 +248,7 @@ class CodeGen(Visitor[JSVisitorContext]):
         return f'{node.arg}:{self.visit(node.value)}' if node.arg is not None else f'...{self.visit(node.value)}'
 
     def visit_arguments(self, node: ast.arguments, ctx: JSVisitorContext):
-        context = ctx.copy()
-        context.scope = JSScope.ARGUMENT
+        context = ctx.copy(scope=JSScope.ARGUMENT)
 
         kwlen = len(node.defaults)
         kwargs = node.args[-kwlen:]
@@ -337,6 +353,14 @@ class CodeGen(Visitor[JSVisitorContext]):
             .write(BaseBuilder(separator=';').write(BaseBuilder().write_if(expr.optional_vars, f'{self.visit(expr.optional_vars)}=').write(f'_with_{i}.__exit__()') for i, expr in enumerate(node.items)))
 
         return builder.build()
+    
+    def visit_JoinedStr(self, node: ast.JoinedStr, ctx: JSVisitorContext):
+        context = ctx.copy(scope=JSScope.F_STRING)
+        return '`{}`'.format(''.join(map(lambda item: self.visit(item, context), node.values)))
+
+    def visit_FormattedValue(self, node: ast.FormattedValue, ctx: JSVisitorContext):
+        a = f'${{{self.visit(node.value, ctx)}}}'
+        return a
 
 
 def convert(
