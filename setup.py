@@ -24,5 +24,5 @@ setup(
     py_modules=py_modules,
     platforms="any",
     packages=find_packages(),
-    requires=requires
+    requires=['jsbeautifier', 'strbuilder'],
 )
