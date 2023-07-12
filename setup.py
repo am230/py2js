@@ -9,11 +9,11 @@ py_modules = [name]
 
 setup(
     name=name,
-    version="1.1.8",
-    keywords=("javascript", "convert", "translator"),
+    version="1.2.1",
+    keywords=["javascript", "convert", "translator"],
     description="Write javascript in python with python syntax",
     long_description=long_description,
-    requires=['jsbeautifier', 'strbuilder'],
+    requires=['jsbeautifier', 'strinpy'],
     license="MIT Licence",
     long_description_content_type='text/x-rst',
     packages=find_packages(),

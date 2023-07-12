@@ -1,11 +1,23 @@
 import py2js
 import typing
 
+
 this = typing.Self
 
 
-@py2js.js
+@py2js.convert
 def translated_normal():
+    bb = {'c': 'd'}
+    aa = {
+        bb['c']: '4',
+    }
+
+    'keyword'
+    def func(a: str, *args, **kwargs):
+        console.log(a)
+
+    func('a', 'b', 'c', kw='kw')
+
     'generator'
     def generator_func():
         yield 1
@@ -26,7 +38,7 @@ def translated_normal():
 
     'f-string'
     a = 4
-    console.log(f'{a} fstring')
+    console.log(f'fstring {a}')
 
     'class'
     class Main:
@@ -67,9 +79,54 @@ def translated_normal():
     i = 5
     if 0 < i < 9:
         console.log('true')
+    else:
+        console.log('false')
+
+    'comprehension'
+    console.log([i for i in Array(10)])
+    console.log([i for i in Array(10) if i % 2 == 0])
+
+    'decorator'
+    def decorator(func):
+        def wrapper():
+            console.log('decorator')
+            func()
+        return wrapper
+
+    @decorator
+    def decorated():
+        console.log('decorated')
+
+    class Decorated:
+        @decorator
+        def decorated():
+            console.log('decorated')
+
+    decorated()
+
+    'lambda'
+    console.log((lambda x: x + 1)(1))
+
+    'async'
+    async def async_func():
+        console.log('async')
+        return 0
+
+    async def async_func2():
+        await async_func()
+
+    'async for'
+    async def async_for():
+        for i in Array(10):
+            await async_func()
+
+    'async with'
+    async def async_with():
+        async with open('translated_normal.js', 'r') as f:
+            console.log(await f.read())
 
 
-@py2js.js(python_compatible=True)
+@py2js.compatible
 def translated_compatible():
     'class with self args'
     class Main:
