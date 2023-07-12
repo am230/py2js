@@ -1,3 +1,9 @@
+let bb = {
+    c: `d`
+};
+let aa = {
+    [bb[c]]: `4`
+};
 `keyword`;
 let func = (a, {
     ...kwargs
@@ -32,13 +38,13 @@ let a = 4;
 console.log(`fstring ${a}`);
 `class`;
 let Main = class {
+    a;
     constructor() {
         this.a = 1
     };
     func() {
         console.log(this.a)
     }
-    a
 }
 Main = new Proxy(Main, {
     apply: (clazz, thisValue, args) => new clazz(...args)
@@ -97,6 +103,7 @@ let decorated = decorator(() => {
     console.log(`decorated`)
 });
 let Decorated = class {
+    ;
     decorated = decorator(() => {
         console.log(`decorated`)
     })

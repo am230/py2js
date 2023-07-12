@@ -7,6 +7,11 @@ this = typing.Self
 
 @py2js.convert
 def translated_normal():
+    bb = {'c': 'd'}
+    aa = {
+        bb['c']: '4',
+    }
+
     'keyword'
     def func(a: str, *args, **kwargs):
         console.log(a)

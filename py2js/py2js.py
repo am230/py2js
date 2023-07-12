@@ -6,8 +6,7 @@ import re
 import types
 from dataclasses import dataclass, field
 from functools import reduce
-from typing import Any, List, Dict, Optional, Union, Callable
-import abc
+from typing import List, Dict, Optional, Union, Callable
 
 import jsbeautifier
 import strinpy
@@ -21,7 +20,8 @@ class JSScope(enum.Enum):
     FUNCTION_FIELD = 2
     ARGUMENT = 3
     F_STRING = 4
-    FOR_LOOP = 5
+    JOINED_STR = 5
+    FOR_LOOP = 6
 
 
 @dataclass
@@ -100,9 +100,11 @@ class CodeGen(Visitor[JSVisitorContext]):
 
     CONSTANT_CONSUMER_TABLE: Dict[type, Callable] = {
         bool: lambda value, ctx: 'true' if value else 'false',
-        str: lambda value, ctx: ('%s' if ctx.scope == JSScope.F_STRING else f'`%s`') % value.replace('`', '\\`').replace('$', '\\$'),
+        # str: lambda value, ctx: ("'%s'" if ctx.scope == JSScope.F_STRING else f'`%s`') % value.replace('`', '\\`').replace('$', '\\$'),
+        str: lambda value, ctx: value.replace('\\', '\\\\').replace('$', '\\$').replace('`', '\\`') if ctx.scope == JSScope.JOINED_STR else "'{}'".format(value.replace('\\', '\\\\').replace('\'', '\\\'')) if ctx.scope == JSScope.F_STRING else '\'{}\''.format(value.replace('\\', '\\\\').replace("'", "\\'")),
         int: lambda value, ctx: str(value),
         float: lambda value, ctx: str(value),
+        bytes: lambda value, ctx: f'new Uint8Array([{",".join(str(b) for b in value)}])',
         type(None): lambda _, ctx: 'null',
         type(...): lambda _, ctx: 'ellipsis'
     }
@@ -152,10 +154,11 @@ class CodeGen(Visitor[JSVisitorContext]):
             f'let {node.name} = class',
             ['{',
                 self.compatible and '''constructor(...args) {if ('__init__' in this) this.__init__(...args); return new Proxy(this, { apply: (target, self, args) => target.__call__(...args), get: (target, key) => target[key] || target.__getitem__(key) })}''',
-                self.visit(filter(lambda node: isinstance(node, ast.FunctionDef), node.body), context),
                 self.visit(filter(lambda node: not isinstance(node, ast.FunctionDef), node.body), context),
+                ';',
+                self.visit(filter(lambda node: isinstance(node, ast.FunctionDef), node.body), context),
              '}'],
-            node.bases and (f'''Object.getOwnPropertyNames({base}.prototype).forEach(name => {{if (name !== 'constructor') {{{node.name}.prototype[name] = {base}.prototype[name];}}}});''' for base in map(lambda base: self.visit(base, ctx), node.bases)),
+            node.bases and [f'''Object.getOwnPropertyNames({base}.prototype).forEach(name => {{if (name !== 'constructor') {{{node.name}.prototype[name] = {base}.prototype[name];}}}});''' for base in map(lambda base: self.visit(base, ctx), node.bases)],
             f'{node.name} = new Proxy({node.name}, {{ apply: (clazz, thisValue, args) => new clazz(...args) }});',
             node.decorator_list and (f'{node.name} = ', reduce(lambda value, element: f'{element}({value})', map(lambda decorator: self.visit(decorator, ctx), node.decorator_list), node.name), ';'),
         ])
@@ -305,7 +308,7 @@ class CodeGen(Visitor[JSVisitorContext]):
             '(',
             args and [self.visit(args, context)],
             node.keywords and [
-                args and ', '
+                args and ', ',
                 '{',
                 self.visit(filter(lambda kw: kw.arg is not None, node.keywords), context),
                 self.visit(filter(lambda kw: kw.arg is None, node.keywords), context),
@@ -369,7 +372,10 @@ class CodeGen(Visitor[JSVisitorContext]):
         return f'/*tuple*/{self.visit_List(*args)}'
 
     def visit_Dict(self, node: ast.Dict, ctx: JSVisitorContext):
-        return '{%s}' % ', '.join(f'{self.visit(key, ctx.copy(scope=JSScope.F_STRING))}: {self.visit(value, ctx)}' for key, value in zip(node.keys, node.values))
+        return '{%s}' % ', '.join(f'{self.visit(key, ctx.copy(scope=JSScope.F_STRING)) if isinstance(key, ast.Constant) else "["+self.visit(key, ctx.copy(scope=JSScope.F_STRING))+"]"}: {self.visit(value, ctx)}' for key, value in zip(node.keys, node.values))
+
+    def visit_Set(self, node: ast.Set, ctx: JSVisitorContext):
+        return f'new Set([{", ".join(map(lambda x: self.visit(x, ctx), node.elts))}])'
 
     def visit_Lambda(self, node: ast.Lambda, ctx: JSVisitorContext):
         f'{self.visit(node.args, ctx)}=> {{return {self.visit(node.body, ctx)}}}'
@@ -447,24 +453,21 @@ class CodeGen(Visitor[JSVisitorContext]):
         return f'{self.UNARY_OP_TABLE[type(node.op)]}{self.visit(node.operand, ctx)}'
 
     def visit_ListComp(self, node: ast.ListComp, ctx: JSVisitorContext):
-        ctx.parent = node
-        return f'{self.visit(node.generators, ctx)}'
+        context = ctx.copy()
+        context.parent = node
+        return f'{self.visit(node.generators, context)}'
 
     def visit_DictComp(self, node: ast.DictComp, ctx: JSVisitorContext):
-        "Object.fromEntries([1,2,3].map(n=>[n,1]))"
-        return f'Object.fromEntries({self.visit(node.generators, ctx)})'
+        context = ctx.copy()
+        context.parent = node
+        return f'Object.fromEntries({self.visit(node.generators, context)})'
+
+    def visit_SetComp(self, node: ast.SetComp, ctx: JSVisitorContext):
+        context = ctx.copy()
+        context.parent = node
+        return f'new Set({self.visit(node.generators, context)})'
 
     def visit_comprehension(self, node: ast.comprehension, ctx: JSVisitorContext):
-        # builder = Builder(f'{self.visit(node.iter, ctx)}')
-        # target = self.visit(node.target, ctx)
-        # builder.write_if(node.ifs, (f'.filter({target}=>{self.visit(x, ctx)})' for x in node.ifs))
-
-        # if isinstance(ctx.parent, ast.DictComp):
-        #     builder.write(f'.map(({target})=>[{self.visit(ctx.parent.key, ctx)}, {self.visit(ctx.parent.value, ctx)}])')
-        # else:
-        #     builder.write(f'.map(({target})=>{self.visit(ctx.parent.elt, ctx)})')
-
-        # return builder.build()
         code = [
             self.visit(node.iter, ctx),
             node.ifs and [f'.filter({self.visit(node.target, ctx)}=>{self.visit(x, ctx)})' for x in node.ifs],
@@ -473,6 +476,11 @@ class CodeGen(Visitor[JSVisitorContext]):
             f'.map(({self.visit(node.target, ctx)})=>{self.visit(ctx.parent.elt, ctx)})',  # type: ignore
         ]
         return strinpy.build(code)
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp, ctx: JSVisitorContext):
+        context = ctx.copy()
+        context.parent = node
+        return self.visit(node.generators, context)
 
     def visit_IfExp(self, node: ast.IfExp, ctx: JSVisitorContext):
         return f'{self.visit(node.test, ctx)} ? {self.visit(node.body, ctx)} : {self.visit(node.orelse, ctx)}'
@@ -532,11 +540,14 @@ class CodeGen(Visitor[JSVisitorContext]):
         ])
 
     def visit_JoinedStr(self, node: ast.JoinedStr, ctx: JSVisitorContext):
-        context = ctx.copy(scope=JSScope.F_STRING)
-        return '`{}`'.format(''.join(map(lambda item: self.visit(item, context), node.values)))
+        context = ctx.copy(scope=JSScope.JOINED_STR)
+        a = '`{}`'.format(''.join(map(lambda item: self.visit(item, context), node.values)))
+        return a
 
     def visit_FormattedValue(self, node: ast.FormattedValue, ctx: JSVisitorContext):
-        return f'${{{self.visit(node.value, ctx)}}}'
+        context = ctx.copy(scope=JSScope.F_STRING)
+        a = f'${{{self.visit(node.value, context)}}}'
+        return a
 
     def visit_Delete(self, node: ast.Delete, ctx: JSVisitorContext):
         return ';'.join(map(lambda target: f'delete {self.visit(target, ctx)}', node.targets))

@@ -9,8 +9,8 @@ py_modules = [name]
 
 setup(
     name=name,
-    version="1.2.0",
-    keywords=("javascript", "convert", "translator"),
+    version="1.2.1",
+    keywords=["javascript", "convert", "translator"],
     description="Write javascript in python with python syntax",
     long_description=long_description,
     requires=['jsbeautifier', 'strinpy'],

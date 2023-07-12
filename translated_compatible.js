@@ -6,7 +6,7 @@ let Main = class {
             apply: (target, self, args) => target.__call__(...args),
             get: (target, key) => target[key] || target.__getitem__(key)
         })
-    }
+    };
     __init__(...__args) {
         ((self, value) => {
             self.a = value

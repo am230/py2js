@@ -1,5 +1,4 @@
 import ast
-import functools
 import inspect
 from typing import Callable, Generic, List, Optional, Self, TypeVar, Union
 
