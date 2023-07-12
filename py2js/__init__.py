@@ -1,1 +1,1 @@
-from .py2js import js, convert, Visitor, JSVisitorContext
+from .py2js import compatible, convert, Visitor, JSVisitorContext
